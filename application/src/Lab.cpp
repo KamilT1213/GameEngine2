@@ -31,15 +31,71 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 
 	screenQuadMaterial->setValue("u_ScreenSize", m_ScreenSize);
 
+	//AA screen pass mat
+	ShaderDescription screenAAQuadShaderDesc;
+	screenAAQuadShaderDesc.type = ShaderType::rasterization;
+	screenAAQuadShaderDesc.vertexSrcPath = "./assets/shaders/QuadVert.glsl";
+	screenAAQuadShaderDesc.fragmentSrcPath = "./assets/shaders/AAFrag.glsl";
+	std::shared_ptr<Shader> screenAAQuadShader = std::make_shared<Shader>(screenAAQuadShaderDesc);
+	std::shared_ptr<Material> screenAAQuadMaterial = std::make_shared<Material>(screenAAQuadShader);
+
+	screenAAQuadMaterial->setValue("u_ScreenSize", m_ScreenSize);
+
 	//VAOs ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	//Screen Quad VAOs
+	std::vector<float> screenVertices;
+	std::vector<float> screenAAVertices;
+
+	screenAAVertices = std::vector<float>{
+		//Position               UV
+	0.0f,  0.0f,   0.0f,     0.0f, 1.0f, // Bottom Left
+	width, 0.0f,   0.0f,     1.0f, 1.0f, // Bottom Right
+	width, height, 0.0f,     1.0f, 0.0f, // Top Right
+	0.0f,  height, 0.0f,     0.0f, 0.0f  // Top Left
+	};
+
+	float a = glm::max(width, height);
+	float b = glm::min(width, height);
+	float c = (a - b)/2;
+
+	float widthOffset, heightOffset;
+	if (width > height) {
+		screenVertices = std::vector<float>{
+			//Position               UV
+		c,  0.0f,   0.0f,     0.0f, 1.0f, // Bottom Left
+		width - c, 0.0f,   0.0f,     1.0f, 1.0f, // Bottom Right
+		width - c, height, 0.0f,     1.0f, 0.0f, // Top Right
+		c,  height, 0.0f,     0.0f, 0.0f  // Top Left
+		};
+	}
+	else {
+		screenVertices = std::vector<float>{
+			//Position               UV
+		0.0f,  c,   0.0f,     0.0f, 1.0f, // Bottom Left
+		width, c,   0.0f,     1.0f, 1.0f, // Bottom Right
+		width, height - c, 0.0f,     1.0f, 0.0f, // Top Right
+		0.0f,  height - c, 0.0f,     0.0f, 0.0f  // Top Left
+		};
+	}
+
+
+
+	const std::vector<uint32_t> screenIndices = { 0,1,2,2,3,0 };
+
 	std::shared_ptr<VAO> screenQuadVAO;
 	screenQuadVAO = std::make_shared<VAO>(screenIndices);
 	screenQuadVAO->addVertexBuffer(screenVertices, {
 		{GL_FLOAT, 3},  // position
 		{GL_FLOAT, 2}   // UV
 	});
+
+	std::shared_ptr<VAO> screenAAQuadVAO;
+	screenAAQuadVAO = std::make_shared<VAO>(screenIndices);
+	screenAAQuadVAO->addVertexBuffer(screenAAVertices, {
+		{GL_FLOAT, 3},  // position
+		{GL_FLOAT, 2}   // UV
+		});
 
 	//Actors ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -94,25 +150,48 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	quad.material = screenQuadMaterial;
 	m_screenScene->m_actors.push_back(quad);
 
+	Actor AAquad;
+	AAquad.geometry = screenAAQuadVAO;
+	AAquad.material = screenAAQuadMaterial;
+
 
 /*************************
-*  Final Screen Render Pass
+*  Screen Render Pass
 **************************/
 
-	RenderPass finalScreenPass;
-	finalScreenPass.scene = m_screenScene;
-	finalScreenPass.parseScene();
-	finalScreenPass.target = std::make_shared<FBO>();
-	finalScreenPass.viewPort = { 0,0,m_winRef.getWidth(), m_winRef.getHeight() };
+	RenderPass ScreenPass;
+	ScreenPass.scene = m_screenScene;
+	ScreenPass.parseScene();
+	ScreenPass.target = std::make_shared<FBO>(m_winRef.doGetSize(), mainScreenPassLayout);
+	ScreenPass.viewPort = { 0,0,m_winRef.getWidth(), m_winRef.getHeight() };
 
-	finalScreenPass.camera.projection = glm::ortho(0.f, width, height, 0.f);
-	finalScreenPass.UBOmanager.setCachedValue("b_camera2D", "u_view2D", finalScreenPass.camera.view);
-	finalScreenPass.UBOmanager.setCachedValue("b_camera2D", "u_projection2D", finalScreenPass.camera.projection);
+	ScreenPass.camera.projection = glm::ortho(0.f, width, height, 0.f);
+	ScreenPass.UBOmanager.setCachedValue("b_camera2D", "u_view2D", ScreenPass.camera.view);
+	ScreenPass.UBOmanager.setCachedValue("b_camera2D", "u_projection2D", ScreenPass.camera.projection);
 
+	m_mainRenderer.addRenderPass(ScreenPass);
 
+	/*************************
+	*  AA Render Pass
+	**************************/
 
+	screenAAQuadMaterial->setValue("u_inputTexture", ScreenPass.target->getTarget(0));
 
-	m_mainRenderer.addRenderPass(finalScreenPass);
+	m_screenScene.reset(new Scene);
+	m_screenScene->m_actors.push_back(AAquad);
+
+	RenderPass ScreenAAPass;
+	ScreenAAPass.scene = m_screenScene;
+	ScreenAAPass.parseScene();
+	ScreenAAPass.target = std::make_shared<FBO>();
+	ScreenAAPass.viewPort = { 0,0,m_winRef.getWidth(), m_winRef.getHeight() };
+
+	ScreenAAPass.camera.projection = glm::ortho(0.f, width, height, 0.f);
+	ScreenAAPass.UBOmanager.setCachedValue("b_camera2D", "u_view2D", ScreenAAPass.camera.view);
+	ScreenAAPass.UBOmanager.setCachedValue("b_camera2D", "u_projection2D", ScreenAAPass.camera.projection);
+
+	m_mainRenderer.addRenderPass(ScreenAAPass);
+
 }
 void Scene0::onRender() const
 {
@@ -134,11 +213,30 @@ void Scene0::onUpdate(float timestep)
 	}
 
 	if (focusMode) {
-		m_PointerPos += (m_winRef.doGetMouseVector() * glm::vec2(1, -1)) / m_ScreenSize;
+		m_PointerPos += (m_winRef.doGetMouseVector() * glm::vec2(1, -1)) / glm::min(width,height);
 		m_PointerPos = glm::clamp((m_PointerPos), glm::vec2(0), glm::vec2(1));
 	}
 
+	float timePerSegment = 0.5f;
+	float Segments = 7.0f;
+
+	if (m_winRef.doIsMouseButtonPressed(GLFW_MOUSE_BUTTON_1)) {
+		ProgressBar += timestep * ((1/timePerSegment) / Segments);
+		if (ProgressBar > 1) {
+			ProgressBar = 1;
+		}
+	}
+	else {
+		ProgressBar -= timestep;
+		if (ProgressBar < 0) {
+			ProgressBar = 0;
+		}
+	}
+
+	float x = floor(ProgressBar * Segments) / Segments;
+
 	QuadMat->setValue("MousePos",(m_PointerPos) );
+	QuadMat->setValue("Progress", x);
 
 	//colPass.target->use();
 	//float UVData[3];

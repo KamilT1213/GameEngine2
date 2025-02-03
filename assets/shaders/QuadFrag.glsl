@@ -5,14 +5,24 @@ out vec4 colour;
 in vec2 texCoords;
 
 uniform vec2 MousePos;
+uniform float Progress;
 
 uniform vec2 u_ScreenSize;
 
+float pi = 3.1415;
+float sizeOfRing = 15;
+
 void main()
 {
+    float ScreenPixelSize = 1.0/min(u_ScreenSize.x, u_ScreenSize.y);
     colour = vec4(texCoords, 0, 1);
-    if (distance((texCoords - MousePos) * vec2(1, u_ScreenSize.y/ u_ScreenSize.x), vec2(0)) < 0.005) {
+    vec2 localToMouse = (texCoords - MousePos);
+    float RfromM = distance(localToMouse, vec2(0));
+    if (RfromM < ScreenPixelSize * sizeOfRing && RfromM > ScreenPixelSize * (sizeOfRing - 5) && atan(-localToMouse.x, -localToMouse.y) < (Progress * pi * 2) - pi) {
         colour = vec4(vec3(1), 1);
+    }
+    if (RfromM < ScreenPixelSize * (sizeOfRing - 5)) {
+        colour = mix(colour, vec4(vec3(1), 1), 0.5f);
     }
 
 }

@@ -34,6 +34,7 @@ private:
 	ImVec2 uv0 = ImVec2(0.0f, 1.0f);
 	ImVec2 uv1 = ImVec2(1.0f, 0.0f);
 	
+	float ProgressBar{0.0f};
 	
 	//std::shared_ptr<SSBO> terrainParticlesStartPoints;
 	//std::shared_ptr<SSBO> terrainParticles;
@@ -56,6 +57,10 @@ private:
 	//Gui
 	int Buffer{ 0 };
 
+	FBOLayout mainScreenPassLayout = {
+		{AttachmentType::ColourHDR,true}
+	};
+
 	//FBOLayout typicalLayout = {
 	//	{AttachmentType::ColourHDR, true},
 	//	{AttachmentType::ColourHDR, true},
@@ -65,14 +70,6 @@ private:
 	//	{AttachmentType::Depth, true}
 	//};
 
-	const std::vector<float> screenVertices = {
-		//Position               UV
-	0.0f,  0.0f,   0.0f,     0.0f, 1.0f, // Bottom Left
-	width, 0.0f,   0.0f,     1.0f, 1.0f, // Bottom Right
-	width, height, 0.0f,     1.0f, 0.0f, // Top Right
-	0.0f,  height, 0.0f,     0.0f, 0.0f  // Top Left
-	};
 
-	const std::vector<uint32_t> screenIndices = { 0,1,2,2,3,0 };
 };
 
