@@ -6,7 +6,7 @@ layout(location = 1) in vec2 a_UV;
 out vec2 texCoords;
 
 
-layout(std140, binding = 5) uniform b_camera2D
+layout(std140, binding = 0) uniform b_camera2D
 {
 	uniform mat4 u_view2D;
 	uniform mat4 u_projection2D;

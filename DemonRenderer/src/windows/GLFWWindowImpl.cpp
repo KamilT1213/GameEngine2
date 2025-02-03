@@ -234,6 +234,10 @@ void GLFWWindowImpl::doSwitchInput()
 	}
 	else 
 	{
+		int width, height;
+		glfwGetWindowSize(m_nativeWindow.get(), &width, &height);
+		glfwSetCursorPos(m_nativeWindow.get(), width / 2.0f, height / 2.0f);
+
 		glfwSetInputMode(m_nativeWindow.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		if (glfwRawMouseMotionSupported()) {
 			glfwSetInputMode(m_nativeWindow.get(), GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
