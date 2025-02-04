@@ -1,6 +1,7 @@
 #version 460 core
 
-out vec4 colour;
+layout(location = 0)out vec4 colour;
+layout(location = 1)out vec4 uv;
 
 in vec2 texCoords;
 
@@ -8,6 +9,7 @@ uniform vec2 MousePos;
 uniform float Progress;
 
 uniform vec2 u_ScreenSize;
+uniform sampler2D u_GroundTexture;
 
 float pi = 3.1415;
 float sizeOfRing = 15;
@@ -15,7 +17,8 @@ float sizeOfRing = 15;
 void main()
 {
     float ScreenPixelSize = 1.0/min(u_ScreenSize.x, u_ScreenSize.y);
-    colour = vec4(texCoords, 0, 1);
+    colour = texture(u_GroundTexture, texCoords);
+    uv = vec4(texCoords, 0, 1);
     vec2 localToMouse = (texCoords - MousePos);
     float RfromM = distance(localToMouse, vec2(0));
     if (RfromM < ScreenPixelSize * sizeOfRing && RfromM > ScreenPixelSize * (sizeOfRing - 5) && atan(-localToMouse.x, -localToMouse.y) < (Progress * pi * 2) - pi) {

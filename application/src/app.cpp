@@ -11,7 +11,7 @@ App::App(const WindowProperties& winProps) : Application(winProps)
 
 Application* startApplication()
 {
-	WindowProperties props("GAMR3521", 1920 * 0.75f, 1080 * 0.75f);
+	WindowProperties props("GAMR3521",  1920 * 0.75f, 1080 * 0.75f);
 	props.isHostingImGui = true;
 	props.isResizable = false;
 	return new App(props);

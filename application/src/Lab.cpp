@@ -16,6 +16,15 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 
 	//Textures -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+	TextureDescription groundTextureDesc;
+	groundTextureDesc.height = 4096.0f;
+	groundTextureDesc.width = 4096.0f;
+	groundTextureDesc.channels = 4;
+	groundTextureDesc.isHDR = true;
+	
+	std::shared_ptr<Texture> groundTexture = std::make_shared<Texture>(groundTextureDesc);
+	
+
 	//Cube maps -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	//Materials -------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -40,6 +49,12 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	std::shared_ptr<Material> screenAAQuadMaterial = std::make_shared<Material>(screenAAQuadShader);
 
 	screenAAQuadMaterial->setValue("u_ScreenSize", m_ScreenSize);
+
+	ShaderDescription compute_GroundShaderDesc;
+	compute_GroundShaderDesc.type = ShaderType::compute;
+	compute_GroundShaderDesc.computeSrcPath = "./assets/shaders/compute_Ground.glsl";
+	std::shared_ptr<Shader> compute_GroundShader = std::make_shared<Shader>(compute_GroundShaderDesc);
+	std::shared_ptr<Material> compute_GroundMaterial = std::make_shared<Material>(compute_GroundShader);
 
 	//VAOs ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -132,22 +147,29 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	//Terrain:
 
 	//Terrain Normals Compute Pass
-	//ComputePass normalTextureComputePass;
-	//normalTextureComputePass.material = normalComputeMat;
-	//normalTextureComputePass.workgroups = { 128,128,1 };
-	//normalTextureComputePass.barrier = MemoryBarrier::ShaderImageAccess;
+	ComputePass GroundComputePass;
+	GroundComputePass.material = compute_GroundMaterial;
+	GroundComputePass.workgroups = { 128,128,1 };
+	GroundComputePass.barrier = MemoryBarrier::ShaderImageAccess;
 
-	//Image CDMnormals;
-	//CDMnormals.mipLevel = 0;
-	//CDMnormals.layered = false;
-	//CDMnormals.texture = terrainNormalTexure;
-	//CDMnormals.imageUnit = normalTextureComputePass.material->m_shader->m_imageBindingPoints["terrainNormalImg"];
-	//CDMnormals.access = TextureAccess::ReadWrite;
+	Image GroundImg;
+	GroundImg.mipLevel = 0;
+	GroundImg.layered = false;
+	GroundImg.texture = groundTexture;
+	GroundImg.imageUnit = GroundComputePass.material->m_shader->m_imageBindingPoints["GroundImg"];
+	GroundImg.access = TextureAccess::ReadWrite;
+
+	GroundComputePass.workgroups = { 128,128,1 };
+	GroundComputePass.barrier = MemoryBarrier::ShaderImageAccess;
+	GroundComputePass.images.push_back(GroundImg);
+
+	m_mainRenderer.addComputePass(GroundComputePass);
 
 	Actor quad;
 	quad.geometry = screenQuadVAO;
 
 	quad.material = screenQuadMaterial;
+	screenQuadMaterial->setValue("u_GroundTexture", groundTexture);
 	m_screenScene->m_actors.push_back(quad);
 
 	Actor AAquad;
@@ -200,8 +222,14 @@ void Scene0::onRender() const
 }
 void Scene0::onUpdate(float timestep)
 {
-	auto& screenPass = m_mainRenderer.getRenderPass(0);
+	allTime += timestep / 10.0f;
+
+	auto& computeGroundPass = m_mainRenderer.getComputePass(0);
+	auto& screenPass = m_mainRenderer.getRenderPass(1);
+	auto& screenAAPass = m_mainRenderer.getRenderPass(2);
+
 	auto QuadMat = screenPass.scene->m_actors.at(0).material;
+	auto AAQuadMat = screenAAPass.scene->m_actors.at(0).material;
 
 	if (m_winRef.doIsKeyPressed(GLFW_KEY_TAB) && !modeToggle) {
 		modeToggle = true;
@@ -221,15 +249,28 @@ void Scene0::onUpdate(float timestep)
 	float Segments = 7.0f;
 
 	if (m_winRef.doIsMouseButtonPressed(GLFW_MOUSE_BUTTON_1)) {
-		ProgressBar += timestep * ((1/timePerSegment) / Segments);
+		ProgressBar += timestep;// *((1 / timePerSegment) / Segments);
 		if (ProgressBar > 1) {
 			ProgressBar = 1;
 		}
 	}
 	else {
-		ProgressBar -= timestep;
+		ProgressBar -= timestep * 5;
 		if (ProgressBar < 0) {
 			ProgressBar = 0;
+		}
+	}
+
+	if (m_winRef.doIsKeyPressed(GLFW_KEY_R)) {
+		Reseting = true;
+		ResetWave = 1.0f;
+	}
+	else {
+		if (Reseting) {
+			ResetWave -= timestep;
+			if (ResetWave <= -0.1f) {
+				Reseting = false;
+			}
 		}
 	}
 
@@ -237,12 +278,45 @@ void Scene0::onUpdate(float timestep)
 
 	QuadMat->setValue("MousePos",(m_PointerPos) );
 	QuadMat->setValue("Progress", x);
+	AAQuadMat->setValue("allTime", allTime);
+	computeGroundPass.material->setValue("Reset", (float)(int)Reseting);
+	computeGroundPass.material->setValue("ResetWave", ResetWave);
+	if (ProgressBar >= 1) {
+		Pressed = true;
+	}
+	else {
+		Pressed = false;
+	}
+	computeGroundPass.material->setValue("action", (float)(int)Pressed);
+	computeGroundPass.material->setValue("MousePos", (m_PointerPos));
+	computeGroundPass.material->setValue("dt", timestep);
 
-	//colPass.target->use();
-	//float UVData[3];
-	//glNamedFramebufferReadBuffer(colPass.target->getID(), colPass.target->m_colAttachments[1]);
-	//glReadPixels(colW / 2, colH / 2, 1, 1, GL_RGB, GL_FLOAT, &UVData);
+	//spdlog::info("Reset Wave: {:03.2f}", ResetWave);
+	//spdlog::info("Reseting: {:03.2f}", (float)(int)Reseting);
+	screenPass.target->use();
+	float UVData[4];
+	glNamedFramebufferReadBuffer(screenPass.target->getID(), screenPass.target->m_colAttachments[1]);
+	glm::vec2 temp = m_PointerPos * glm::min(width, height);
+	float a = glm::max(width, height) - glm::min(width, height);
+	a /= 2;
+	if (width > height) {
+		temp.x += a;
+	}
+	else {
+		temp.y += a;
+	}
+	
+	temp -= glm::vec2(0.0001f, 0.0001f);
 
+	//temp = glm::clamp(temp, glm::vec2(0), glm::vec2(width, height));
+	glReadPixels(temp.x, temp.y, 1, 1, GL_RGB, GL_FLOAT, &UVData);
+
+	for (int i = 0; i < 4; i++) {
+		UVData[i] = glm::clamp(UVData[i], 0.0f, 1.0f);
+	}
+
+	gameMouseLocation = glm::vec2(UVData[0], UVData[1]);
+	//spdlog::info("mouse x: {:03.2f}, mouse y: {:03.2f}", gameMouseLocation.x , gameMouseLocation.y);
 	
 }
 
@@ -267,6 +341,7 @@ void Scene0::onImGUIRender()
 			ImGui::Checkbox("Toggle Screen Shaders ", &b);
 
 			ImGui::NewLine();
+			ImGui::DragFloat("Factor", &factor, 1.0f, 1.0f, 10000.0f);
 			ImGui::NewLine();
 			ImGui::NewLine();
 			//ImGui::Checkbox("Wireframe ", &m_wireFrame);

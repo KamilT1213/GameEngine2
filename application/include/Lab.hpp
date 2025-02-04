@@ -29,12 +29,19 @@ private:
 	bool b{true};
 	bool focusMode{ false };
 	bool modeToggle{ false };
+	bool Reseting{ false };
+	bool Pressed{ false };
 
 	ImVec2 imageSize = ImVec2(width / 3, height / 3);
 	ImVec2 uv0 = ImVec2(0.0f, 1.0f);
 	ImVec2 uv1 = ImVec2(1.0f, 0.0f);
+
+	glm::vec2 gameMouseLocation{ 0,0 };
 	
 	float ProgressBar{0.0f};
+	float allTime{ 0.0f };
+	float factor{ 1.0f };
+	float ResetWave{ 1.0f };
 	
 	//std::shared_ptr<SSBO> terrainParticlesStartPoints;
 	//std::shared_ptr<SSBO> terrainParticles;
@@ -58,8 +65,11 @@ private:
 	int Buffer{ 0 };
 
 	FBOLayout mainScreenPassLayout = {
+		{AttachmentType::ColourHDR,true},
 		{AttachmentType::ColourHDR,true}
+
 	};
+	
 
 	//FBOLayout typicalLayout = {
 	//	{AttachmentType::ColourHDR, true},

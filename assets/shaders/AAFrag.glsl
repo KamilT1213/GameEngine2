@@ -5,6 +5,8 @@ out vec4 colour;
 in vec2 texCoords;
 
 uniform sampler2D u_inputTexture;
+uniform float factor;
+uniform float allTime;
 
 uniform vec2 u_ScreenSize;
 
@@ -65,23 +67,35 @@ void main()
     float bTotal;
     if (Samples[4].a <= 0) {
         for (int i = 0; i < 5; i++) {
-            bTotal += noise((texCoords + vec2(i)) * (i + 1) * 42.532);
+            bTotal += noise((texCoords + vec2(i) + vec2(sin((allTime*3) + (texCoords.y * 5)) / 100, allTime/10)) * (i + 1) * 42.532);
         }
         bTotal = ((bTotal / 5) + 1) / 2.0;
         bTotal = ((floor(bTotal * 20) + 0.5) / 20);
 
         vec2 normedTex = texCoords;
         vec2 dist = vec2(normedTex.x - 0.5f, normedTex.y - 0.5f) ;
-        dist.x *= (u_ScreenSize.x / u_ScreenSize.y);
 
-        float d = b - a;
-        d *= 0.5;
+        if (u_ScreenSize.x > u_ScreenSize.y) {
+            dist.x *= (u_ScreenSize.x / u_ScreenSize.y);
+        }
+        else {
+            dist.y *= (u_ScreenSize.y / u_ScreenSize.x);
+        }
+        
+
+        float d = c;
+       /* d *= 0.5;
         d = d / b;
-        d *= 2.0;
+        d *= 2.0;*/
 
-        float distance = max(abs(dist.x), abs(dist.y)) - d;
-        bTotal *= clamp((distance * 2),0,1);
-        total = vec4(vec3(bTotal), 1.0);
+        float s = 1;
+
+        dist *= s;
+        
+
+        float distance = (max(abs(dist.x), abs(dist.y)) - (d * s));
+        bTotal += clamp(((distance) * 2),-1.0,0.3);
+        total =  vec4(vec3(0.3,bTotal,0.6), 1.0);
     }
 
     colour = total;// vec4(vec3(rgb2hsv(Samples[4].rgb).z), 1); //vec4(vec3(Edge()), 1);//

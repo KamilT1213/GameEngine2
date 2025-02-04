@@ -16,6 +16,7 @@ Texture::Texture(const char* filepath,uint32_t wrapS, uint32_t wrapT, uint32_t m
 	if (data) init(width, height, channels, data, HDR, wrapS , wrapT , minFilter , magFilter);
 	else spdlog::error("Failed to load texture from filepath: {}", filepath);
 	stbi_image_free(data);
+	
 }
 
 Texture::Texture(const TextureDescription& desc)
