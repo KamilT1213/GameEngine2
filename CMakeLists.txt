@@ -97,6 +97,7 @@ set (RENDERER_HEADER_FILES
 	"DemonRenderer/include/gameObjects/renderable.hpp"
 	"DemonRenderer/include/gameObjects/scriptable.hpp"
 	"DemonRenderer/include/gameObjects/transformable.hpp"
+	"DemonRenderer/include/sound/soundManager.hpp"
 )
 set (RENDERER_SOURCE_FILES
 	"DemonRenderer/src/core/application.cpp"
@@ -125,6 +126,7 @@ set (RENDERER_SOURCE_FILES
 	"DemonRenderer/src/rendering/renderer.cpp"
 	"DemonRenderer/src/rendering/renderPass.cpp"
 	"DemonRenderer/src/rendering/depthOnlyPass.cpp"
+	"DemonRenderer/src/sound/soundManager.cpp"
 )
 
 # Add library target (renderer) and include directory

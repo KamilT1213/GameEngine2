@@ -6,10 +6,11 @@ layout(location = 1)out vec4 uv;
 in vec2 texCoords;
 
 uniform vec2 MousePos;
+uniform vec2 DigPos;
 uniform float Progress;
 
 uniform vec2 u_ScreenSize;
-uniform sampler2D u_GroundTexture;
+uniform sampler2D u_GroundDepthTexture;
 
 float pi = 3.1415;
 float sizeOfRing = 15;
@@ -17,15 +18,38 @@ float sizeOfRing = 15;
 void main()
 {
     float ScreenPixelSize = 1.0/min(u_ScreenSize.x, u_ScreenSize.y);
-    colour = texture(u_GroundTexture, texCoords);
+    float groundDepth = texture(u_GroundDepthTexture, texCoords).r;
+    //groundDepth = floor(groundDepth * 20);
+    //groundDepth += 0.5;
+    //groundDepth /= 20;
+
+
+    if (groundDepth > 0) {
+        colour = mix(vec4(0.3, 0.3, 0.3, 1.0), vec4(0.15, 0.15, 0.15, 0.0), mod(1 - groundDepth, 1 / 3.0) * 3);
+    }
+    if (groundDepth > 1 / 3.0) {
+        colour = mix(vec4(0.8, 0.5, 0.2, 1.0), vec4(0.4, 0.25, 0.1, 1.0), mod(1 - groundDepth, 1 / 3.0) * 3);
+    }
+    if (groundDepth > 2 / 3.0) {
+        colour = mix(vec4(0.1, 0.9, 0.2, 1.0), vec4(0.075, 0.675, 0.15, 1.0), mod(1 - groundDepth, 1 / 3.0) * 3);
+    }
+    //colour = mix(vec4(0.1, 0.9, 0.2,1.0), vec4(0.7, 0.4, 0.1,1.0),1 - groundDepth);
+    //colour = mix(colour, vec4(0.3, 0.3, 0.3, 1.0), 1 - groundDepth);
+
     uv = vec4(texCoords, 0, 1);
-    vec2 localToMouse = (texCoords - MousePos);
+    vec2 localToMouse = (texCoords - DigPos);
     float RfromM = distance(localToMouse, vec2(0));
     if (RfromM < ScreenPixelSize * sizeOfRing && RfromM > ScreenPixelSize * (sizeOfRing - 5) && atan(-localToMouse.x, -localToMouse.y) < (Progress * pi * 2) - pi) {
         colour = vec4(vec3(1), 1);
     }
     if (RfromM < ScreenPixelSize * (sizeOfRing - 5)) {
-        colour = mix(colour, vec4(vec3(1), 1), 0.5f);
+        colour = mix(colour, vec4(vec3(1), 1), 0.7f);
+    }
+
+    localToMouse = (texCoords - MousePos);
+    RfromM = distance(localToMouse, vec2(0));
+    if (RfromM < ScreenPixelSize * (sizeOfRing - 7.5)) {
+        colour = mix(colour, vec4(vec3(1), 1), 0.4f);
     }
 
 }

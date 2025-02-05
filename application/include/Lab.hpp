@@ -19,18 +19,23 @@ private:
 private:
 	std::shared_ptr<Scene> m_mainScene;
 	std::shared_ptr<Scene> m_screenScene;
+
+	SoundManager m_soundManager;
 	
 	float width = m_winRef.getWidthf();
 	float height = m_winRef.getHeightf();
 
 	glm::vec2 m_ScreenSize = glm::vec2(m_winRef.getSizef());
 	glm::vec2 m_PointerPos = glm::vec2(0.5);
+	glm::vec2 m_DigPos = glm::vec2(0.5);
 
 	bool b{true};
 	bool focusMode{ false };
 	bool modeToggle{ false };
 	bool Reseting{ false };
 	bool Pressed{ false };
+	bool finished{ false };
+	float ProgressSegmentTarget{ 0.0f };
 
 	ImVec2 imageSize = ImVec2(width / 3, height / 3);
 	ImVec2 uv0 = ImVec2(0.0f, 1.0f);
@@ -42,6 +47,7 @@ private:
 	float allTime{ 0.0f };
 	float factor{ 1.0f };
 	float ResetWave{ 1.0f };
+	float Subby{ 0.99f };
 	
 	//std::shared_ptr<SSBO> terrainParticlesStartPoints;
 	//std::shared_ptr<SSBO> terrainParticles;

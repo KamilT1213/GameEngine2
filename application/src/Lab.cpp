@@ -5,7 +5,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <numeric> // For std::iota
 #include <string>
-
+//#include <windows.h>
+//#include <mmsystem.h>
 
 Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 {
@@ -23,7 +24,7 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	groundTextureDesc.isHDR = true;
 	
 	std::shared_ptr<Texture> groundTexture = std::make_shared<Texture>(groundTextureDesc);
-	
+	std::shared_ptr<Texture> groundTextureTemp = std::make_shared<Texture>(groundTextureDesc);
 
 	//Cube maps -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -157,11 +158,19 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	GroundImg.layered = false;
 	GroundImg.texture = groundTexture;
 	GroundImg.imageUnit = GroundComputePass.material->m_shader->m_imageBindingPoints["GroundImg"];
-	GroundImg.access = TextureAccess::ReadWrite;
+	GroundImg.access = TextureAccess::ReadWrite;	
+	
+	Image GroundImgTemp;
+	GroundImgTemp.mipLevel = 0;
+	GroundImgTemp.layered = false;
+	GroundImgTemp.texture = groundTextureTemp;
+	GroundImgTemp.imageUnit = GroundComputePass.material->m_shader->m_imageBindingPoints["GroundImgHold"];
+	GroundImgTemp.access = TextureAccess::ReadWrite;
 
 	GroundComputePass.workgroups = { 128,128,1 };
-	GroundComputePass.barrier = MemoryBarrier::ShaderImageAccess;
+	GroundComputePass.barrier =  MemoryBarrier::ShaderImageAccess;
 	GroundComputePass.images.push_back(GroundImg);
+	GroundComputePass.images.push_back(GroundImgTemp);
 
 	m_mainRenderer.addComputePass(GroundComputePass);
 
@@ -169,7 +178,7 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	quad.geometry = screenQuadVAO;
 
 	quad.material = screenQuadMaterial;
-	screenQuadMaterial->setValue("u_GroundTexture", groundTexture);
+	screenQuadMaterial->setValue("u_GroundDepthTexture", groundTexture);
 	m_screenScene->m_actors.push_back(quad);
 
 	Actor AAquad;
@@ -244,22 +253,87 @@ void Scene0::onUpdate(float timestep)
 		m_PointerPos += (m_winRef.doGetMouseVector() * glm::vec2(1, -1)) / glm::min(width,height);
 		m_PointerPos = glm::clamp((m_PointerPos), glm::vec2(0), glm::vec2(1));
 	}
+	if (!Pressed) {
+		m_DigPos = m_PointerPos;
+	}
 
-	float timePerSegment = 0.5f;
+	float timeToDig = 3.0f;
+	float timePerSegment = 0.7f;
 	float Segments = 7.0f;
+	float x = ProgressBar;
 
-	if (m_winRef.doIsMouseButtonPressed(GLFW_MOUSE_BUTTON_1)) {
-		ProgressBar += timestep;// *((1 / timePerSegment) / Segments);
-		if (ProgressBar > 1) {
-			ProgressBar = 1;
+	bool isExtracting = m_winRef.doIsKeyPressed(GLFW_KEY_E);
+	
+	if (isExtracting) {
+
+		if (m_winRef.doIsMouseButtonPressed(GLFW_MOUSE_BUTTON_1) && !finished) {
+			Pressed = true;
+			ProgressBar += timestep * ((1 / timePerSegment) / Segments);
+			if (ProgressBar > 1) {
+				finished = true;
+				ProgressBar = 1;
+			}
 		}
+		else {
+			finished = true;
+			ProgressBar -= timestep * 5;
+			if (ProgressBar < 0) {
+				ProgressBar = 0;
+				ProgressSegmentTarget = 1;
+				Pressed = false;
+				finished = false;
+			}
+		}
+
+		if (ProgressBar * Segments >= ProgressSegmentTarget) {
+
+			int r = rand() % 4;
+
+			std::string s = "./assets/sounds/Extraction_soft_var";
+			s += char('0' + r);
+			s.append(".wav");
+
+			m_soundManager.playSound(s.c_str());
+			//spdlog::info("PlaySound");
+			ProgressSegmentTarget++;
+		}
+
+		x = floor(ProgressBar * Segments) / Segments;
 	}
 	else {
-		ProgressBar -= timestep * 5;
-		if (ProgressBar < 0) {
-			ProgressBar = 0;
+		if (m_winRef.doIsMouseButtonPressed(GLFW_MOUSE_BUTTON_1) && !finished) {
+			Pressed = true;
+			ProgressBar += timestep / timeToDig;
+			if (ProgressBar > 1) {
+				finished = true;
+				ProgressBar = 1;
+			}
+		}
+		else {
+			finished = true;
+			ProgressBar -= timestep * 5;
+			if (ProgressBar < 0) {
+				ProgressBar = 0;
+				ProgressSegmentTarget = 0.5;
+				Pressed = false;
+				finished = false;
+			}
+		}
+
+		if (ProgressBar * timeToDig >= ProgressSegmentTarget) {
+
+			int r = rand() % 2;
+
+			std::string s = "./assets/sounds/Digging_soft_var";
+			s += char('0' + r);
+			s.append(".wav");
+
+			m_soundManager.playSound(s.c_str());
+			//spdlog::info("PlaySound");
+			ProgressSegmentTarget++;
 		}
 	}
+	
 
 	if (m_winRef.doIsKeyPressed(GLFW_KEY_R)) {
 		Reseting = true;
@@ -267,37 +341,44 @@ void Scene0::onUpdate(float timestep)
 	}
 	else {
 		if (Reseting) {
-			ResetWave -= timestep;
+			ResetWave -= timestep / 3;
 			if (ResetWave <= -0.1f) {
 				Reseting = false;
 			}
 		}
 	}
 
-	float x = floor(ProgressBar * Segments) / Segments;
+	
 
 	QuadMat->setValue("MousePos",(m_PointerPos) );
+	QuadMat->setValue("DigPos",(m_DigPos) );
 	QuadMat->setValue("Progress", x);
 	AAQuadMat->setValue("allTime", allTime);
 	computeGroundPass.material->setValue("Reset", (float)(int)Reseting);
-	computeGroundPass.material->setValue("ResetWave", ResetWave);
-	if (ProgressBar >= 1) {
-		Pressed = true;
-	}
-	else {
-		Pressed = false;
-	}
-	computeGroundPass.material->setValue("action", (float)(int)Pressed);
-	computeGroundPass.material->setValue("MousePos", (m_PointerPos));
-	computeGroundPass.material->setValue("dt", timestep);
+	computeGroundPass.material->setValue("ResetWave", glm::clamp(( - glm::pow(ResetWave - 1, 2.0f)) + 1,0.0f,1.0f));
+	//if (ProgressBar >= 1) {
+	//	Pressed = true;
+	//}
+	//else {
+	//	Pressed = false;
+	//}
+	float action = ProgressBar;
+	float x2 = glm::mod(action, 1 / timeToDig);
+	float x3 = glm::pow(x2 * timeToDig, 30)/ timeToDig;
+	float x4 = glm::floor(action * timeToDig) / timeToDig;
+	action = x3 + x4;
+	computeGroundPass.material->setValue("action", action);
+	computeGroundPass.material->setValue("digging", (float)(int)(!finished && !isExtracting));
+	computeGroundPass.material->setValue("MousePos", (m_DigPos));
+	computeGroundPass.material->setValue("subBy", Subby);
 
 	//spdlog::info("Reset Wave: {:03.2f}", ResetWave);
 	//spdlog::info("Reseting: {:03.2f}", (float)(int)Reseting);
 	screenPass.target->use();
 	float UVData[4];
 	glNamedFramebufferReadBuffer(screenPass.target->getID(), screenPass.target->m_colAttachments[1]);
-	glm::vec2 temp = m_PointerPos * glm::min(width, height);
-	float a = glm::max(width, height) - glm::min(width, height);
+	glm::vec2 temp = m_DigPos * glm::min(width, height);
+	float a = (width, height) - (width, height);
 	a /= 2;
 	if (width > height) {
 		temp.x += a;

@@ -49,6 +49,8 @@
 #include "windows/graphicsContext.hpp"
 #include "windows/window.hpp"
 
+#include "sound/soundManager.hpp"
+
 
 
 
