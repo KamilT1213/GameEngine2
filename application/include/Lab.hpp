@@ -17,7 +17,7 @@ private:
 	void onKeyPressed(KeyPressedEvent& e) override;
 	void onImGUIRender() override;
 private:
-	std::shared_ptr<Scene> m_mainScene;
+	std::shared_ptr<Scene> m_RelicScene;
 	std::shared_ptr<Scene> m_screenScene;
 
 	SoundManager m_soundManager;
@@ -35,6 +35,7 @@ private:
 	bool Reseting{ false };
 	bool Pressed{ false };
 	bool finished{ false };
+	bool extrBegan{ false };
 	float ProgressSegmentTarget{ 0.0f };
 
 	ImVec2 imageSize = ImVec2(width / 3, height / 3);
@@ -47,7 +48,13 @@ private:
 	float allTime{ 0.0f };
 	float factor{ 1.0f };
 	float ResetWave{ 1.0f };
-	float Subby{ 0.99f };
+	float Subby{ 0.3f };
+
+	size_t GroundComputePassIDx;
+	size_t GroundNormalComputePassIDx;
+	size_t ScreenGroundPassIDx;
+	size_t ScreenRelicPassIDx;
+	size_t AAPassIDx;
 	
 	//std::shared_ptr<SSBO> terrainParticlesStartPoints;
 	//std::shared_ptr<SSBO> terrainParticles;
@@ -59,7 +66,9 @@ private:
 	};*/
 
 	Renderer m_mainRenderer;
-	//Renderer m_computeRenderer;
+	Renderer m_computeRenderer;
+
+
 
 	// Actor positions for ease of use and to avoid additonal magic numbers
 
@@ -75,6 +84,7 @@ private:
 		{AttachmentType::ColourHDR,true}
 
 	};
+
 	
 
 	//FBOLayout typicalLayout = {

@@ -29,14 +29,14 @@ void main()
 		sampled.z = 1;
 		sampled.a = 1;
 		if (ResetWave <= 0) {
-			sampled.x = 1;
+			sampled.x = 1 - (noiseLevel/2);
 			imageStore(GroundImgHold, pixel_coords, sampled);
 		}
 	}
 	else {
 		if (action > 0 && action < 1 && digging > 0) {
 			
-			float Size = (4096.0 / 5.0);
+			float Size = (4096.0 / 15.0);
 			float dist = distance(pixel_coords, texCoords) / Size;
 
 			float noiseLevel = noise(vec2(pixel_coords.x + 5812, pixel_coords.y + 321) / 200);
@@ -44,11 +44,16 @@ void main()
 			noiseLevel += 1;
 			noiseLevel /= 2;
 
-			float arcs = acos(dist + noiseLevel);
+			float noiseLevel2 = noise(vec2(pixel_coords.x + 5812, pixel_coords.y + 321) / 50);
+			noiseLevel2 /= 1;
+			noiseLevel2 += 1;
+			noiseLevel2 /= 2;
+
+			float arcs = acos(dist + (noiseLevel2 /4.0));
 			float distBetweenCentre = distance(sampled.x, middleSampled.x);
 			arcs = sin(arcs);// *Size;
 			//arcs -= (Size - 1);
-			if (dist < Size && !isnan(arcs) && distBetweenCentre < 0.3) {
+			if (dist < Size && !isnan(arcs) && distBetweenCentre < 0.2) {
 
 				//noiseLevel *= (distBetweenCentre * 2);
 				//noiseLevel = clamp(noiseLevel, 0, 1);

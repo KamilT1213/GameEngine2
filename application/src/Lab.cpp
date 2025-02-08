@@ -12,10 +12,12 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 {
 
 	m_winRef.setVSync(false);
-	m_mainScene.reset(new Scene);
+	m_RelicScene.reset(new Scene);
 	m_screenScene.reset(new Scene);
 
 	//Textures -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	std::shared_ptr<Texture> testRelicTexture = std::make_shared<Texture>("./assets/textures/Relic.png");
 
 	TextureDescription groundTextureDesc;
 	groundTextureDesc.height = 4096.0f;
@@ -25,6 +27,7 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	
 	std::shared_ptr<Texture> groundTexture = std::make_shared<Texture>(groundTextureDesc);
 	std::shared_ptr<Texture> groundTextureTemp = std::make_shared<Texture>(groundTextureDesc);
+	std::shared_ptr<Texture> groundNormalTexture = std::make_shared<Texture>(groundTextureDesc);
 
 	//Cube maps -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -51,11 +54,25 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 
 	screenAAQuadMaterial->setValue("u_ScreenSize", m_ScreenSize);
 
+	//Relic mat
+	ShaderDescription RelicShaderDesc;
+	RelicShaderDesc.type = ShaderType::rasterization;
+	RelicShaderDesc.vertexSrcPath = "./assets/shaders/RelicVert.glsl";
+	RelicShaderDesc.fragmentSrcPath = "./assets/shaders/RelicFrag.glsl";
+	std::shared_ptr<Shader> RelicShader = std::make_shared<Shader>(RelicShaderDesc);
+	//std::shared_ptr<Material> RelicMaterial = std::make_shared<Material>(RelicShader);
+
 	ShaderDescription compute_GroundShaderDesc;
 	compute_GroundShaderDesc.type = ShaderType::compute;
 	compute_GroundShaderDesc.computeSrcPath = "./assets/shaders/compute_Ground.glsl";
 	std::shared_ptr<Shader> compute_GroundShader = std::make_shared<Shader>(compute_GroundShaderDesc);
 	std::shared_ptr<Material> compute_GroundMaterial = std::make_shared<Material>(compute_GroundShader);
+
+	ShaderDescription compute_GroundNormalShaderDesc;
+	compute_GroundNormalShaderDesc.type = ShaderType::compute;
+	compute_GroundNormalShaderDesc.computeSrcPath = "./assets/shaders/compute_CDMnormals.glsl";
+	std::shared_ptr<Shader> compute_GroundNormalShader = std::make_shared<Shader>(compute_GroundNormalShaderDesc);
+	std::shared_ptr<Material> compute_GroundNormalMaterial = std::make_shared<Material>(compute_GroundNormalShader);
 
 	//VAOs ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -113,7 +130,47 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 		{GL_FLOAT, 2}   // UV
 		});
 
+	std::vector<float> RelicVertices;
+
+	RelicVertices = std::vector<float>{
+		//Position               UV
+	-1.0f,  -1.0f,   0.0f,     0.0f, 1.0f, // Bottom Left
+	 1.0f,  -1.0f,   0.0f,     1.0f, 1.0f, // Bottom Right
+	 1.0f,   1.0f,   0.0f,     1.0f, 0.0f, // Top Right
+	-1.0f,   1.0f,   0.0f,     0.0f, 0.0f  // Top Left
+	};
+
+	std::shared_ptr<VAO> RelicVAO;
+	RelicVAO = std::make_shared<VAO>(screenIndices);
+	RelicVAO->addVertexBuffer(RelicVertices, {
+		{GL_FLOAT,3},  // position
+		{GL_FLOAT,2}   // UV
+		});
+
 	//Actors ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	Actor Relic;
+	Relic.geometry = RelicVAO;
+
+	for (int i = 0; i < 10; i++) {
+
+		float rarity = Randomiser::uniformFloatBetween(0.01f, 6.0f);
+		std::shared_ptr<Material> RelicMaterial = std::make_shared<Material>(RelicShader);
+		RelicMaterial->setValue("u_RelicTexture", testRelicTexture);
+		RelicMaterial->setValue("u_Rarity", rarity);
+		RelicMaterial->setValue("u_Id", (float)(i + 1)/11.0f);
+		RelicMaterial->setValue("u_active", (float)(int)true);
+
+		Relic.scale = glm::vec3(Randomiser::uniformFloatBetween(100.0f, 150.0f) * (( 0.5f *( (7.0f - (1 + rarity)) / 7.0f)) + 0.5f) );
+
+		Relic.translation =  glm::vec3(Randomiser::uniformFloatBetween(Relic.scale.x, 4096.0f - Relic.scale.x), Randomiser::uniformFloatBetween(Relic.scale.y, 4096.0f - Relic.scale.y), -1.0f);
+		
+
+		Relic.material = RelicMaterial;
+
+		Relic.recalc();
+		m_RelicScene->m_actors.push_back(Relic);
+	}
 
 	//Particles
 	//Actor particles;
@@ -167,46 +224,105 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	GroundImgTemp.imageUnit = GroundComputePass.material->m_shader->m_imageBindingPoints["GroundImgHold"];
 	GroundImgTemp.access = TextureAccess::ReadWrite;
 
-	GroundComputePass.workgroups = { 128,128,1 };
-	GroundComputePass.barrier =  MemoryBarrier::ShaderImageAccess;
 	GroundComputePass.images.push_back(GroundImg);
 	GroundComputePass.images.push_back(GroundImgTemp);
 
+	GroundComputePassIDx = m_mainRenderer.getSumPassCount();
 	m_mainRenderer.addComputePass(GroundComputePass);
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	ComputePass GroundNormalComputePass;
+	GroundNormalComputePass.material = compute_GroundNormalMaterial;
+	GroundNormalComputePass.workgroups = { 128,128,1 };
+	GroundNormalComputePass.barrier = MemoryBarrier::ShaderImageAccess;
+
+	Image GroundNormalImg;
+	GroundNormalImg.mipLevel = 0;
+	GroundNormalImg.layered = false;
+	GroundNormalImg.texture = groundNormalTexture;
+	GroundNormalImg.imageUnit = GroundNormalComputePass.material->m_shader->m_imageBindingPoints["groundNormalImg"];
+	GroundNormalImg.access = TextureAccess::ReadWrite;
+
+	GroundNormalComputePass.images.push_back(GroundImg);
+	GroundNormalComputePass.images.push_back(GroundNormalImg);
+
+	GroundNormalComputePassIDx = m_computeRenderer.getSumPassCount();
+	m_computeRenderer.addComputePass(GroundNormalComputePass);
+	m_computeRenderer.render();
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 
 	Actor quad;
 	quad.geometry = screenQuadVAO;
-
+	
+	screenQuadMaterial->setValue("u_GroundDepthTexture", groundTextureTemp);
+	
+	//screenQuadMaterial->setValue("u_GroundNormalTexture", groundNormalTexture);
 	quad.material = screenQuadMaterial;
-	screenQuadMaterial->setValue("u_GroundDepthTexture", groundTexture);
+
 	m_screenScene->m_actors.push_back(quad);
 
 	Actor AAquad;
 	AAquad.geometry = screenAAQuadVAO;
 	AAquad.material = screenAAQuadMaterial;
-
+	//AAquad.translation = glm::vec3(500.9f,0,0);
+	//AAquad.scale = glm::vec3(2);
+	//AAquad.recalc();
 
 /*************************
-*  Screen Render Pass
+*  Screen Relic Render Pass
 **************************/
 
-	RenderPass ScreenPass;
-	ScreenPass.scene = m_screenScene;
-	ScreenPass.parseScene();
-	ScreenPass.target = std::make_shared<FBO>(m_winRef.doGetSize(), mainScreenPassLayout);
-	ScreenPass.viewPort = { 0,0,m_winRef.getWidth(), m_winRef.getHeight() };
+	RenderPass ScreenRelicPass;
+	ScreenRelicPass.scene = m_RelicScene;
+	ScreenRelicPass.parseScene();
+	ScreenRelicPass.target = std::make_shared<FBO>(glm::ivec2(4096,4096), mainScreenPassLayout);
+	ScreenRelicPass.viewPort = { 0,0,4096, 4096 };
 
-	ScreenPass.camera.projection = glm::ortho(0.f, width, height, 0.f);
-	ScreenPass.UBOmanager.setCachedValue("b_camera2D", "u_view2D", ScreenPass.camera.view);
-	ScreenPass.UBOmanager.setCachedValue("b_camera2D", "u_projection2D", ScreenPass.camera.projection);
+	ScreenRelicPass.camera.projection = glm::ortho(0.f, 4096.0f, 4096.0f, 0.f);
 
-	m_mainRenderer.addRenderPass(ScreenPass);
+	ScreenRelicPass.UBOmanager.setCachedValue("b_relicCamera2D", "u_relicView2D", ScreenRelicPass.camera.view);
+	ScreenRelicPass.UBOmanager.setCachedValue("b_relicCcamera2D", "u_relicProjection2D", ScreenRelicPass.camera.projection);
+
+	for (int i = 0; i < m_RelicScene->m_actors.size(); i++) {
+		m_RelicScene->m_actors.at(i).material->setValue("u_relicView2D", ScreenRelicPass.camera.view);
+		m_RelicScene->m_actors.at(i).material->setValue("u_relicProjection2D", ScreenRelicPass.camera.projection);
+	}
+
+	ScreenRelicPassIDx = m_mainRenderer.getSumPassCount();
+	m_mainRenderer.addRenderPass(ScreenRelicPass);
+
+	
+
+	screenQuadMaterial->setValue("u_RelicTexture", ScreenRelicPass.target->getTarget(0));
+	screenQuadMaterial->setValue("u_RelicDataTexture", ScreenRelicPass.target->getTarget(1));
+
+/*************************
+*  Screen Ground Render Pass
+**************************/
+	RenderPass ScreenGroundPass;
+	ScreenGroundPass.scene = m_screenScene;
+	ScreenGroundPass.parseScene();
+	ScreenGroundPass.target = std::make_shared<FBO>(m_winRef.doGetSize(), mainScreenPassLayout);
+	ScreenGroundPass.viewPort = { 0,0,m_winRef.getWidth(), m_winRef.getHeight() };
+
+	ScreenGroundPass.camera.projection = glm::ortho(0.f, width, height, 0.f);
+	ScreenGroundPass.UBOmanager.setCachedValue("b_camera2D", "u_view2D", ScreenGroundPass.camera.view);
+	ScreenGroundPass.UBOmanager.setCachedValue("b_camera2D", "u_projection2D", ScreenGroundPass.camera.projection);
+
+	Buffer = ScreenGroundPass.target->getTarget(1)->getID();
+
+	ScreenGroundPassIDx = m_mainRenderer.getSumPassCount();
+	m_mainRenderer.addRenderPass(ScreenGroundPass);
 
 	/*************************
 	*  AA Render Pass
 	**************************/
 
-	screenAAQuadMaterial->setValue("u_inputTexture", ScreenPass.target->getTarget(0));
+	screenAAQuadMaterial->setValue("u_inputTexture", ScreenGroundPass.target->getTarget(0));
 
 	m_screenScene.reset(new Scene);
 	m_screenScene->m_actors.push_back(AAquad);
@@ -221,6 +337,7 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	ScreenAAPass.UBOmanager.setCachedValue("b_camera2D", "u_view2D", ScreenAAPass.camera.view);
 	ScreenAAPass.UBOmanager.setCachedValue("b_camera2D", "u_projection2D", ScreenAAPass.camera.projection);
 
+	AAPassIDx = m_mainRenderer.getSumPassCount();
 	m_mainRenderer.addRenderPass(ScreenAAPass);
 
 }
@@ -233,11 +350,21 @@ void Scene0::onUpdate(float timestep)
 {
 	allTime += timestep / 10.0f;
 
-	auto& computeGroundPass = m_mainRenderer.getComputePass(0);
-	auto& screenPass = m_mainRenderer.getRenderPass(1);
-	auto& screenAAPass = m_mainRenderer.getRenderPass(2);
+	auto& computeGroundPass = m_mainRenderer.getComputePass(GroundComputePassIDx);
+	auto& relicPass = m_mainRenderer.getRenderPass(ScreenRelicPassIDx);
+	auto& screenGroundPass = m_mainRenderer.getRenderPass(ScreenGroundPassIDx);
+	auto& screenAAPass = m_mainRenderer.getRenderPass(AAPassIDx);
 
-	auto QuadMat = screenPass.scene->m_actors.at(0).material;
+	//for (int i = 0; i < m_mainRenderer.getRenderPassCount(); i++) {
+	//	auto& targetPass = m_mainRenderer.getRenderPass(i);
+	//	targetPass.UBOmanager.setCachedValue("b_camera2D", "u_view2D", screenGroundPass.camera.view);
+	//	targetPass.UBOmanager.setCachedValue("b_camera2D", "u_projection2D", screenGroundPass.camera.projection);
+
+
+	//	targetPass.UBOmanager.setCachedValue("b_relicCamera2D", "u_relicView2D", relicPass.camera.view);
+	//	targetPass.UBOmanager.setCachedValue("b_relicCcamera2D", "u_relicProjection2D", relicPass.camera.projection);
+	//}
+	auto QuadMat = screenGroundPass.scene->m_actors.at(0).material;
 	auto AAQuadMat = screenAAPass.scene->m_actors.at(0).material;
 
 	if (m_winRef.doIsKeyPressed(GLFW_KEY_TAB) && !modeToggle) {
@@ -257,12 +384,41 @@ void Scene0::onUpdate(float timestep)
 		m_DigPos = m_PointerPos;
 	}
 
-	float timeToDig = 3.0f;
+	float timeToDig = 1.0f;
 	float timePerSegment = 0.7f;
 	float Segments = 7.0f;
 	float x = ProgressBar;
 
-	bool isExtracting = m_winRef.doIsKeyPressed(GLFW_KEY_E);
+	glm::vec2 temp = m_DigPos * glm::min(width, height);
+	float a = glm::max(width, height) - glm::min(width, height);
+	a /= 2;
+	if (width > height) {
+		temp.x += a;
+	}
+	else {
+		temp.y += a;
+	}
+	//temp = m_DigPos;
+	temp -= glm::vec2(0.0001f, 0.0001f);
+
+	//temp = glm::clamp(temp, glm::vec2(0), glm::vec2(width, height));
+
+	screenGroundPass.target->use();
+	float UVData[4];
+	glNamedFramebufferReadBuffer(screenGroundPass.target->getID(), screenGroundPass.target->m_colAttachments[1]);
+	glReadPixels(temp.x, temp.y, 1, 1, GL_RGBA, GL_FLOAT, &UVData);
+
+	//for (int i = 0; i < 4; i++) {
+	//	UVData[i] = glm::clamp(UVData[i], 0.0f, 1.0f);
+	//}
+
+	gameMouseLocation = glm::vec2(UVData[0], UVData[1]);
+	//spdlog::info("mouse x: {:03.2f}, mouse y: {:03.2f}", gameMouseLocation.x, gameMouseLocation.y);
+	//spdlog::info("Relic id: {:03.5f}", );
+
+	int RelId = (int)glm::round(UVData[2] * 11);
+
+	bool isExtracting = (RelId != 0);// m_winRef.doIsKeyPressed(GLFW_KEY_E);
 	
 	if (isExtracting) {
 
@@ -272,6 +428,7 @@ void Scene0::onUpdate(float timestep)
 			if (ProgressBar > 1) {
 				finished = true;
 				ProgressBar = 1;
+				m_RelicScene->m_actors.at(RelId - 1).material->setValue("u_active", 0.0f);
 			}
 		}
 		else {
@@ -300,8 +457,8 @@ void Scene0::onUpdate(float timestep)
 
 		x = floor(ProgressBar * Segments) / Segments;
 	}
-	else {
-		if (m_winRef.doIsMouseButtonPressed(GLFW_MOUSE_BUTTON_1) && !finished) {
+	else  {
+		if (m_winRef.doIsMouseButtonPressed(GLFW_MOUSE_BUTTON_1) && !finished && (RelId == 0)) {
 			Pressed = true;
 			ProgressBar += timestep / timeToDig;
 			if (ProgressBar > 1) {
@@ -311,6 +468,7 @@ void Scene0::onUpdate(float timestep)
 		}
 		else {
 			finished = true;
+			//m_computeRenderer.render();
 			ProgressBar -= timestep * 5;
 			if (ProgressBar < 0) {
 				ProgressBar = 0;
@@ -333,7 +491,6 @@ void Scene0::onUpdate(float timestep)
 			ProgressSegmentTarget++;
 		}
 	}
-	
 
 	if (m_winRef.doIsKeyPressed(GLFW_KEY_R)) {
 		Reseting = true;
@@ -353,6 +510,7 @@ void Scene0::onUpdate(float timestep)
 	QuadMat->setValue("MousePos",(m_PointerPos) );
 	QuadMat->setValue("DigPos",(m_DigPos) );
 	QuadMat->setValue("Progress", x);
+
 	AAQuadMat->setValue("allTime", allTime);
 	computeGroundPass.material->setValue("Reset", (float)(int)Reseting);
 	computeGroundPass.material->setValue("ResetWave", glm::clamp(( - glm::pow(ResetWave - 1, 2.0f)) + 1,0.0f,1.0f));
@@ -374,31 +532,8 @@ void Scene0::onUpdate(float timestep)
 
 	//spdlog::info("Reset Wave: {:03.2f}", ResetWave);
 	//spdlog::info("Reseting: {:03.2f}", (float)(int)Reseting);
-	screenPass.target->use();
-	float UVData[4];
-	glNamedFramebufferReadBuffer(screenPass.target->getID(), screenPass.target->m_colAttachments[1]);
-	glm::vec2 temp = m_DigPos * glm::min(width, height);
-	float a = (width, height) - (width, height);
-	a /= 2;
-	if (width > height) {
-		temp.x += a;
-	}
-	else {
-		temp.y += a;
-	}
-	
-	temp -= glm::vec2(0.0001f, 0.0001f);
 
-	//temp = glm::clamp(temp, glm::vec2(0), glm::vec2(width, height));
-	glReadPixels(temp.x, temp.y, 1, 1, GL_RGB, GL_FLOAT, &UVData);
 
-	for (int i = 0; i < 4; i++) {
-		UVData[i] = glm::clamp(UVData[i], 0.0f, 1.0f);
-	}
-
-	gameMouseLocation = glm::vec2(UVData[0], UVData[1]);
-	//spdlog::info("mouse x: {:03.2f}, mouse y: {:03.2f}", gameMouseLocation.x , gameMouseLocation.y);
-	
 }
 
 
@@ -462,7 +597,7 @@ void Scene0::onImGUIRender()
 
 void Scene0::onKeyPressed(KeyPressedEvent& e)
 {
-	for (auto it = m_mainScene->m_actors.begin(); it != m_mainScene->m_actors.end(); ++it)
+	for (auto it = m_RelicScene->m_actors.begin(); it != m_RelicScene->m_actors.end(); ++it)
 	{
 		it->onKeyPress(e);
 	}

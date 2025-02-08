@@ -27,22 +27,23 @@ float noise(in vec2 p);
 
 void main()
 {
+    vec2 texelSize = 1.0/u_ScreenSize;
     float a = min(u_ScreenSize.x, u_ScreenSize.y);
     float b = max(u_ScreenSize.x, u_ScreenSize.y);
     float c = a / b;
 
     int offset = 1;
-	Samples[0] = textureOffset(u_inputTexture, texCoords,offset * ivec2(-1, 1));
-	Samples[1] = textureOffset(u_inputTexture, texCoords,offset * ivec2(0, 1));
-	Samples[2] = textureOffset(u_inputTexture, texCoords,offset * ivec2(1, 1));
-                                                        
-	Samples[3] = textureOffset(u_inputTexture, texCoords,offset * ivec2(-1, 0));
-	Samples[4] = textureOffset(u_inputTexture, texCoords,offset * ivec2(0, 0));
-	Samples[5] = textureOffset(u_inputTexture, texCoords,offset * ivec2(1, 0));
-                                                        
-	Samples[6] = textureOffset(u_inputTexture, texCoords,offset * ivec2(-1, -1));
-	Samples[7] = textureOffset(u_inputTexture, texCoords,offset * ivec2(0, -1));
-	Samples[8] = textureOffset(u_inputTexture, texCoords,offset * ivec2(1, -1));
+	Samples[0] = texture(u_inputTexture, texCoords + (offset * vec2(-1, 1) * texelSize));
+	Samples[1] = texture(u_inputTexture, texCoords + (offset * vec2(0, 1)  * texelSize));
+	Samples[2] = texture(u_inputTexture, texCoords + (offset * vec2(1, 1)  * texelSize));
+                                                   
+ 	Samples[3] = texture(u_inputTexture, texCoords + (offset * vec2(-1, 0) * texelSize));
+	Samples[4] = texture(u_inputTexture, texCoords + (offset * vec2(0, 0)  * texelSize));
+	Samples[5] = texture(u_inputTexture, texCoords + (offset * vec2(1, 0)  * texelSize));
+                                                   
+ 	Samples[6] = texture(u_inputTexture, texCoords + (offset * vec2(-1, -1)* texelSize));
+	Samples[7] = texture(u_inputTexture, texCoords + (offset * vec2(0, -1) * texelSize));
+	Samples[8] = texture(u_inputTexture, texCoords + (offset * vec2(1, -1) * texelSize));
 
 	Gaussian[0] = 1;
 	Gaussian[1] = 2;
@@ -62,8 +63,9 @@ void main()
         }
         total /= 16.0f;
     }
-
+    
     total = mix(Samples[4], total, clamp(Edge(),0,1));
+    total.xyz = ((floor(total.xyz * 20) + 0.5) / 20);
     float bTotal;
     if (Samples[4].a <= 0) {
         for (int i = 0; i < 5; i++) {
@@ -97,7 +99,7 @@ void main()
         bTotal += clamp(((distance) * 2),-1.0,0.3);
         total =  vec4(vec3(0.3,bTotal,0.6), 1.0);
     }
-
+            
     colour = total;// vec4(vec3(rgb2hsv(Samples[4].rgb).z), 1); //vec4(vec3(Edge()), 1);//
 
 }

@@ -5,17 +5,12 @@ layout(location = 1)out vec4 data;
 
 in vec2 texCoords;
 
-uniform vec2 MousePos;
-uniform vec2 DigPos;
-uniform float Progress;
-
-uniform vec2 u_ScreenSize;
-uniform sampler2D u_GroundDepthTexture;
 uniform sampler2D u_RelicTexture;
-uniform sampler2D u_RelicDataTexture;
+uniform float u_Rarity;
+uniform float u_Id;
+uniform float u_active;
 
 float pi = 3.1415;
-float sizeOfRing = 15;
 
 vec2 hash2(vec2 p);
 float noise(in vec2 p);
@@ -23,80 +18,32 @@ float tpTex(vec3 normal, vec3 pos, float factor);
 
 void main()
 {
-    float ScreenPixelSize = 1.0/min(u_ScreenSize.x, u_ScreenSize.y);
-    float groundDepth = texture(u_GroundDepthTexture, texCoords).r;
-    float groundDepthoff = texture(u_GroundDepthTexture, texCoords + (vec2(1,-1) * (1.0 / u_ScreenSize))).r;
-    //groundDepth = floor(groundDepth * 20);
-    //groundDepth += 0.5;
-    //groundDepth /= 20;
-    //vec2 newTexCoords = ; 
-
-    float n1 = texture(u_GroundDepthTexture, texCoords + (vec2(-1,0) * (1.0 / u_ScreenSize))).r;
-    float n2 = texture(u_GroundDepthTexture, texCoords + (vec2(-1,0) * (1.0 / u_ScreenSize))).r;
-    float n3 = texture(u_GroundDepthTexture, texCoords + (vec2(0,1) * (1.0 / u_ScreenSize))).r;
-    float n4 = texture(u_GroundDepthTexture, texCoords + (vec2(0,-1) * (1.0 / u_ScreenSize))).r;
-
-    float dif1 = n1 - n2;
-    float dif2 = n3 - n4;
-
-    vec3 norm = normalize(vec3(dif1,0.5,dif2));
-
-    float noiseDis  = tpTex(norm, vec3(texCoords.x, groundDepth, texCoords.y) , 200);
-    noiseDis += tpTex(norm, vec3(texCoords.x, groundDepth, texCoords.y) , 100);
-    noiseDis += tpTex(norm, vec3(texCoords.x, groundDepth, texCoords.y), 400);
-    noiseDis /= 3;
-    noiseDis += 1;
-    noiseDis /= 10;
-
-    //float shading = ((dot(texture(u_GroundNormalTexture, texCoords).xyz, normalize(vec3(-1, 0.5, -1))))) * 3;// +1) / 2) * 1;
-
-    //if (groundDepth > 0) {
-    //    colour = mix(vec4(0.4, 0.4, 0.4, 1.0), vec4(0.2, 0.2, 0.2, 1.0), clamp((mod(1 - groundDepth, 1.75 / 3.0) * 3) , 0, 1));
-    //}
-    //if (groundDepth > 1.75 / 3.0) {
-    //    colour = mix(vec4(0.8, 0.5, 0.2, 1.0), vec4(0.4, 0.25, 0.1, 1.0), clamp((mod(1 - groundDepth, 2.75 / 3.0) * 3) + shading, 0, 1));
-    //}
-    //if (groundDepth > 2.75 / 3.0) {
-    //    colour = mix(vec4(0.1, 0.9, 0.2, 1.0), vec4(0.05, 0.45, 0.1, 1.0), clamp((mod(1 - groundDepth, 0.25 / 3.0) * 3) + shading, 0, 1));
-    //}
-    //if (groundDepth > 2.6 / 3.0) {
-    //    colour = vec4(0.2, 1.0, 0.3, 1.0);
-    //}
-    colour = mix(vec4(0.5, 0.5, 0.5, 1.0), vec4(0.4, 0.2, 0.4, 1.0), 1 - groundDepth);
-    if(groundDepth < groundDepthoff && distance(groundDepth,groundDepthoff) > 0.01){
-    colour -= vec4(0.05, 0.05, 0.05, 0.0);
-    }
-
-    colour += vec4(vec3(-noiseDis), 0.0);
-    colour *= (groundDepth/2.0) + (1.0/2.0);
-    //colour = mix(vec4(0.1, 0.9, 0.2,1.0), vec4(0.7, 0.4, 0.1,1.0),1 - groundDepth);
-    //colour = mix(colour, vec4(0.3, 0.3, 0.3, 1.0), 1 - groundDepth);
     
-    //colour = texture(u_GroundDepthTexture, texCoords);//vec4(vec3(groundDepth), 1.0);
-    vec4 c = texture(u_RelicTexture,texCoords);
-    vec4 d = texture(u_RelicDataTexture,texCoords);
-    if(c.a >= 1 && d.x > groundDepth){
-    colour = c;
-    data.z = d.y;
-    }
-    //data = vec4(texCoords,  d.y, 1);
-    //data.z = d.y;
+    colour = texture(u_RelicTexture,texCoords);
 
+    if(colour.a <= 0 || u_active <= 0.0){discard;}
+
+    if(u_Rarity < 1){
+        colour = vec4(vec3(139/255.0, 143/255.0, 140/255.0),1.0);
+    }
+    else if(u_Rarity <= 2){
+        colour = vec4(vec3(48/255.0, 186/255.0, 83/255.0),1.0);
+    }
+    else if(u_Rarity <= 3){
+        colour = vec4(vec3(32/255.0, 104/255.0, 176/255.0),1.0);
+    }
+    else if(u_Rarity <= 4){
+        colour = vec4(vec3(123/255.0, 32/255.0, 176/255.0),1.0);
+    }
+    else if(u_Rarity <= 5){
+        colour = vec4(vec3(255/255.0, 153/255.0, 1/255.0),1.0);
+    }
+    else if(u_Rarity <= 6){
+        colour = vec4(vec3(255/255.0, 1/255.0, 1/255.0),1.0);
+    }
+    colour.a = 1.0;
+    data = vec4(1 - (u_Rarity/6.0), u_Id, 0, 1);
     
-    vec2 localToMouse = (texCoords - DigPos);
-    float RfromM = distance(localToMouse, vec2(0));
-    if (RfromM < ScreenPixelSize * sizeOfRing && RfromM > ScreenPixelSize * (sizeOfRing - 5) && atan(-localToMouse.x, -localToMouse.y) < (Progress * pi * 2) - pi) {
-        colour = vec4(vec3(1), 1);
-    }
-    if (RfromM < ScreenPixelSize * (sizeOfRing - 5)) {
-        colour = mix(colour, vec4(vec3(1), 1), 0.7f);
-    }
-
-    localToMouse = (texCoords - MousePos);
-    RfromM = distance(localToMouse, vec2(0));
-    if (RfromM < ScreenPixelSize * (sizeOfRing - 7.5)) {
-        colour = mix(colour, vec4(vec3(1), 1), 0.4f);
-    }
 
 }
 
