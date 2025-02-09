@@ -8,6 +8,7 @@ in vec2 texCoords;
 uniform vec2 MousePos;
 uniform vec2 DigPos;
 uniform float Progress;
+uniform float RelicFill;
 
 uniform vec2 u_ScreenSize;
 uniform sampler2D u_GroundDepthTexture;
@@ -75,9 +76,10 @@ void main()
     //colour = texture(u_GroundDepthTexture, texCoords);//vec4(vec3(groundDepth), 1.0);
     vec4 c = texture(u_RelicTexture,texCoords);
     vec4 d = texture(u_RelicDataTexture,texCoords);
-    if(c.a >= 1 && d.x > groundDepth){
+    if(c.a >= 1 && clamp(d.x,-0.1,RelicFill) > groundDepth){
     colour = c;
     data.z = d.y;
+    data.a = (1 - d.x) ;
     }
     //data = vec4(texCoords,  d.y, 1);
     //data.z = d.y;

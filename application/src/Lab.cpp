@@ -152,13 +152,13 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	Actor Relic;
 	Relic.geometry = RelicVAO;
 
-	for (int i = 0; i < 10; i++) {
-
+	for (int i = 0; i < Relics; i++) {
+		ActiveRelics[i] = true;
 		float rarity = Randomiser::uniformFloatBetween(0.01f, 6.0f);
 		std::shared_ptr<Material> RelicMaterial = std::make_shared<Material>(RelicShader);
 		RelicMaterial->setValue("u_RelicTexture", testRelicTexture);
 		RelicMaterial->setValue("u_Rarity", rarity);
-		RelicMaterial->setValue("u_Id", (float)(i + 1)/11.0f);
+		RelicMaterial->setValue("u_Id", (float)(i + 1)/ (Relics + 1.0f));
 		RelicMaterial->setValue("u_active", (float)(int)true);
 
 		Relic.scale = glm::vec3(Randomiser::uniformFloatBetween(100.0f, 150.0f) * (( 0.5f *( (7.0f - (1 + rarity)) / 7.0f)) + 0.5f) );
@@ -384,9 +384,11 @@ void Scene0::onUpdate(float timestep)
 		m_DigPos = m_PointerPos;
 	}
 
-	float timeToDig = 1.0f;
-	float timePerSegment = 0.7f;
+	float timeToDig = 3.0f;
+
 	float Segments = 7.0f;
+	float timePerSegment = 0.6f;
+
 	float x = ProgressBar;
 
 	glm::vec2 temp = m_DigPos * glm::min(width, height);
@@ -414,102 +416,163 @@ void Scene0::onUpdate(float timestep)
 
 	gameMouseLocation = glm::vec2(UVData[0], UVData[1]);
 	//spdlog::info("mouse x: {:03.2f}, mouse y: {:03.2f}", gameMouseLocation.x, gameMouseLocation.y);
-	//spdlog::info("Relic id: {:03.5f}", );
+	//spdlog::info("Relic id: {:03.5f}", glm::round(UVData[2] * (Relics + 1)));
 
-	int RelId = (int)glm::round(UVData[2] * 11);
+	int RelId = (int)glm::round(UVData[2] * (Relics + 1));
 
-	bool isExtracting = (RelId != 0);// m_winRef.doIsKeyPressed(GLFW_KEY_E);
+
+
+	Segments = glm::ceil(UVData[3] * 6.0f) + 1.0f;
+	//spdlog::info("Relic Segments: {:03.5f}", Segments);
+
+	bool isExtracting = (RelId != 0 && (ProgressBar == 0 || extrBegan));// m_winRef.doIsKeyPressed(GLFW_KEY_E);
+	bool LevelComplete = false;
+	if (RelicSetWave >= 1 && focusMode) {
+		if (isExtracting) {
+			if (!extrBegan) {
+				extrBegan = true;
+				ProgressBar = 0;
+			}
+
+			if (m_winRef.doIsMouseButtonPressed(GLFW_MOUSE_BUTTON_1) && !finished) {
+				Pressed = true;
+				ProgressBar += timestep * ((1 / timePerSegment) / Segments);
+				if (ProgressBar > 1) {
+					finished = true;
+					ProgressBar = 1;
+					m_RelicScene->m_actors.at(RelId - 1).material->setValue("u_active", 0.0f);
+					ActiveRelics[RelId - 1] = false;
+					for (int i = 0; i < Relics; i++) {
+						if (ActiveRelics[i] == true) {
+							LevelComplete = false;
+							break;
+						}
+						else {
+							LevelComplete = true;
+						}
+					}
+				}
+			}
+			else {
+				finished = true;
+				ProgressBar -= timestep * 5;
+				if (ProgressBar < 0) {
+					extrBegan = false;
+					ProgressBar = 0;
+					ProgressSegmentTarget = 1;
+					Pressed = false;
+					finished = false;
+				}
+			}
+
+			if (ProgressBar * Segments >= ProgressSegmentTarget) {
+
+				int r = rand() % 4;
+
+				std::string s = "./assets/sounds/Extraction_soft_var";
+				s += char('0' + r);
+				s.append(".wav");
+
+				m_soundManager.playSound(s.c_str());
+				//spdlog::info("PlaySound");
+				ProgressSegmentTarget++;
+			}
+
+			x = floor(ProgressBar * Segments) / Segments;
+		}
+		else {
+			if (m_winRef.doIsMouseButtonPressed(GLFW_MOUSE_BUTTON_1) && !finished) {
+				Pressed = true;
+				ProgressBar += timestep / timeToDig;
+				if (ProgressBar > 1) {
+					finished = true;
+					ProgressBar = 1;
+				}
+				if ((RelId != 0)) {
+					finished = true;
+				}
+			}
+			else {
+				finished = true;
+				//m_computeRenderer.render();
+				ProgressBar -= timestep * 5;
+				if (ProgressBar < 0) {
+					ProgressBar = 0;
+					extrBegan = false;
+					ProgressSegmentTarget = 0.5;
+					Pressed = false;
+					finished = false;
+				}
+			}
+
+			if (ProgressBar * timeToDig >= ProgressSegmentTarget) {
+
+				int r = rand() % 2;
+				//int r2 = rand() % 4;
+
+				//std::string s2 = "./assets/sounds/Extraction_soft_var";
+				//s2 += char('0' + r2);
+				//s2.append(".wav");
+
+				//m_soundManager.playSound(s2.c_str());
+
+				std::string s = "./assets/sounds/Digging_soft_var";
+				s += char('0' + r);
+				s.append(".wav");
+
+				m_soundManager.playSound(s.c_str());
+				//spdlog::info("PlaySound");
+				ProgressSegmentTarget++;
+			}
+		}
+	}
 	
-	if (isExtracting) {
 
-		if (m_winRef.doIsMouseButtonPressed(GLFW_MOUSE_BUTTON_1) && !finished) {
-			Pressed = true;
-			ProgressBar += timestep * ((1 / timePerSegment) / Segments);
-			if (ProgressBar > 1) {
-				finished = true;
-				ProgressBar = 1;
-				m_RelicScene->m_actors.at(RelId - 1).material->setValue("u_active", 0.0f);
-			}
-		}
-		else {
-			finished = true;
-			ProgressBar -= timestep * 5;
-			if (ProgressBar < 0) {
-				ProgressBar = 0;
-				ProgressSegmentTarget = 1;
-				Pressed = false;
-				finished = false;
-			}
-		}
-
-		if (ProgressBar * Segments >= ProgressSegmentTarget) {
-
-			int r = rand() % 4;
-
-			std::string s = "./assets/sounds/Extraction_soft_var";
-			s += char('0' + r);
-			s.append(".wav");
-
-			m_soundManager.playSound(s.c_str());
-			//spdlog::info("PlaySound");
-			ProgressSegmentTarget++;
-		}
-
-		x = floor(ProgressBar * Segments) / Segments;
-	}
-	else  {
-		if (m_winRef.doIsMouseButtonPressed(GLFW_MOUSE_BUTTON_1) && !finished && (RelId == 0)) {
-			Pressed = true;
-			ProgressBar += timestep / timeToDig;
-			if (ProgressBar > 1) {
-				finished = true;
-				ProgressBar = 1;
-			}
-		}
-		else {
-			finished = true;
-			//m_computeRenderer.render();
-			ProgressBar -= timestep * 5;
-			if (ProgressBar < 0) {
-				ProgressBar = 0;
-				ProgressSegmentTarget = 0.5;
-				Pressed = false;
-				finished = false;
-			}
-		}
-
-		if (ProgressBar * timeToDig >= ProgressSegmentTarget) {
-
-			int r = rand() % 2;
-
-			std::string s = "./assets/sounds/Digging_soft_var";
-			s += char('0' + r);
-			s.append(".wav");
-
-			m_soundManager.playSound(s.c_str());
-			//spdlog::info("PlaySound");
-			ProgressSegmentTarget++;
-		}
-	}
-
-	if (m_winRef.doIsKeyPressed(GLFW_KEY_R)) {
+	if (m_winRef.doIsKeyPressed(GLFW_KEY_R) || LevelComplete) {
 		Reseting = true;
 		ResetWave = 1.0f;
 	}
 	else {
 		if (Reseting) {
 			ResetWave -= timestep / 3;
+			if (ResetWave <= 0) {
+				RelicSetWave = -0.1f;
+			}
 			if (ResetWave <= -0.1f) {
 				Reseting = false;
+				
+				for (int i = 0; i < Relics; i++) {
+					ActiveRelics[i] = true;
+					float rarity = Randomiser::uniformFloatBetween(0.01f, 6.0f);
+
+					auto RelicMaterial = m_RelicScene->m_actors.at(i).material;
+					auto& Relic = m_RelicScene->m_actors.at(i);
+
+					RelicMaterial->setValue("u_Rarity", rarity);
+					//RelicMaterial->setValue("u_Id", (float)(i + 1) / (Relics + 1.0f));
+					RelicMaterial->setValue("u_active", (float)(int)true);
+
+					Relic.scale = glm::vec3(Randomiser::uniformFloatBetween(100.0f, 150.0f) * ((0.5f * ((7.0f - (1 + rarity)) / 7.0f)) + 0.5f));
+					Relic.translation = glm::vec3(Randomiser::uniformFloatBetween(Relic.scale.x, 4096.0f - Relic.scale.x), Randomiser::uniformFloatBetween(Relic.scale.y, 4096.0f - Relic.scale.y), -1.0f);
+					Relic.recalc();
+
+				}
 			}
 		}
 	}
 
+	if (RelicSetWave < 1) {
+		RelicSetWave += timestep / 3;
+		if (RelicSetWave >= 1) {
+			RelicSetWave = 1;
+		}
+	}
 	
 
 	QuadMat->setValue("MousePos",(m_PointerPos) );
 	QuadMat->setValue("DigPos",(m_DigPos) );
 	QuadMat->setValue("Progress", x);
+	QuadMat->setValue("RelicFill", RelicSetWave);
 
 	AAQuadMat->setValue("allTime", allTime);
 	computeGroundPass.material->setValue("Reset", (float)(int)Reseting);

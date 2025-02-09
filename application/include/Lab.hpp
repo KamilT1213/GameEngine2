@@ -36,6 +36,8 @@ private:
 	bool Pressed{ false };
 	bool finished{ false };
 	bool extrBegan{ false };
+	int Relics{ 100 };
+	bool ActiveRelics[100];
 	float ProgressSegmentTarget{ 0.0f };
 
 	ImVec2 imageSize = ImVec2(width / 3, height / 3);
@@ -48,6 +50,7 @@ private:
 	float allTime{ 0.0f };
 	float factor{ 1.0f };
 	float ResetWave{ 1.0f };
+	float RelicSetWave{ 0.0f };
 	float Subby{ 0.3f };
 
 	size_t GroundComputePassIDx;
