@@ -15,6 +15,8 @@ uniform sampler2D u_GroundDepthTexture;
 uniform sampler2D u_RelicTexture;
 uniform sampler2D u_RelicDataTexture;
 
+uniform float u_flip;
+
 float pi = 3.1415;
 float sizeOfRing = 15;
 
@@ -63,13 +65,13 @@ void main()
     //if (groundDepth > 2.6 / 3.0) {
     //    colour = vec4(0.2, 1.0, 0.3, 1.0);
     //}
-    colour = mix(vec4(0.5, 0.5, 0.5, 1.0), vec4(0.4, 0.2, 0.4, 1.0), 1 - groundDepth);
+    colour = mix(vec4(1.0, 0.925, 0.631, 1.0), vec4(0.875, 0.78, 0.4, 0.423), abs(u_flip - groundDepth));
     if(groundDepth < groundDepthoff && distance(groundDepth,groundDepthoff) > 0.01){
     colour -= vec4(0.05, 0.05, 0.05, 0.0);
     }
 
     colour += vec4(vec3(-noiseDis), 0.0);
-    colour *= (groundDepth/2.0) + (1.0/2.0);
+    //colour *= (groundDepth/2.0) + (1.0/2.0);
     //colour = mix(vec4(0.1, 0.9, 0.2,1.0), vec4(0.7, 0.4, 0.1,1.0),1 - groundDepth);
     //colour = mix(colour, vec4(0.3, 0.3, 0.3, 1.0), 1 - groundDepth);
     

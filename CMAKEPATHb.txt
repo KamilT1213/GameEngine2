@@ -1,1 +1,0 @@
-SET PATH=%PATH%;D:\cmake-3.31.4-windows-x86_64\bin

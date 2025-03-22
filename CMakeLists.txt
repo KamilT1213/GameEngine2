@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.10...3.29)
-
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(APPLICATION_NAME "application")
 
 project(${APPLICATION_NAME} VERSION 1.0.0)
@@ -32,6 +34,7 @@ set (SCRIPT_SOURCE_FILES
 
 # Add excutable target and include directory
 add_executable(${APPLICATION_NAME} ${PROJECT_SOURCE_FILES} ${PROJECT_HEADER_FILES} ${SCRIPT_SOURCE_FILES} ${SCRIPT_HEADER_FILES})
+
 target_include_directories(${APPLICATION_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/application/include")
 target_include_directories(${APPLICATION_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/DemonRenderer/include")
 target_include_directories(${APPLICATION_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/application/") # For scripts, might change this
@@ -137,9 +140,41 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}../DemonRenderer/src" PREFIX "src"
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}../DemonRenderer/include" PREFIX "include" FILES ${RENDERER_HEADER_FILES})
 
 # Add external libraries
+
+
 include(FetchContent)
 
 find_package(OpenGL REQUIRED)
+
+# Ensure SDL2 is installed
+set(SDL_ENABLE_CXX_20 ON CACHE BOOL "" FORCE)
+set(SDL_INSTALL ON CACHE BOOL "" FORCE)
+set(SDL_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(SDL_TESTS_LIBRARY OFF CACHE BOOL "" FORCE)
+set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SDL_SHARED ON CACHE BOOL "" FORCE)
+set(SDL_STATIC ON CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+        SDL2
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG release-2.32.2
+)
+
+FetchContent_MakeAvailable(SDL2)
+
+set(SDL2MIXER_INSTALL OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    SDL2_mixer
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL_mixer.git
+    GIT_TAG release-2.8.1
+)
+
+
+
+FetchContent_MakeAvailable(SDL2_mixer)
+
 
 FetchContent_Declare(
     spdlog
@@ -148,14 +183,24 @@ FetchContent_Declare(
 )
 
 
-set(GLM_ENABLE_CXX_20 ON CACHE BOOL "" FORCE)
-set(GLM_BUILD_LIBRARY ON CACHE BOOL "" FORCE)
+#set(GLM_ENABLE_CXX_20 ON CACHE BOOL "" FORCE)
+#set(GLM_BUILD_LIBRARY ON CACHE BOOL "" FORCE)
+#set(GLM_STATIC_LIBRARY_ENABLE ON CACHE BOOL "" FORCE)
+
+set(GLM_BUILD_LIBRARY OFF CACHE BOOL "" FORCE) # Make sure GLM is not built as a library
+set(GLM_STATIC_LIBRARY_ENABLE OFF CACHE BOOL "" FORCE) # Ensure it's not compiled
+
 
 FetchContent_Declare(
 	glm
 	GIT_REPOSITORY	https://github.com/g-truc/glm.git
 	GIT_TAG 		1.0.1
 )
+
+FetchContent_MakeAvailable(glm)
+
+target_include_directories(${APPLICATION_NAME} PRIVATE ${glm_SOURCE_DIR})
+target_include_directories(${RENDERER_NAME} PRIVATE ${glm_SOURCE_DIR})
 
 FetchContent_Declare(
 	glfw 
@@ -171,6 +216,18 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/SimonCouplandDMU/DMUGlad.git
   GIT_TAG        gl4.6_core_no_ext
  )
+# Force glad to build as a static library
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libraries instead of shared" FORCE)
+
+FetchContent_MakeAvailable(glad)
+
+# Create a glad static library explicitly
+#add_library(glad STATIC ${glad_SOURCE_DIR}/src/glad.c)
+#target_include_directories(glad PUBLIC ${glad_SOURCE_DIR}/include)
+
+target_include_directories(${APPLICATION_NAME} PRIVATE ${glad_SOURCE_DIR}/include)
+target_include_directories(${RENDERER_NAME} PRIVATE ${glad_SOURCE_DIR}/include)
+
 
 set(ASSIMP_BUILD_ZLIB ON)
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
@@ -191,7 +248,7 @@ FetchContent_Declare(GSL
     GIT_SHALLOW ON
 )
 
-FetchContent_MakeAvailable(spdlog glm glfw glad assimp GSL)
+FetchContent_MakeAvailable(spdlog glfw assimp GSL)
 
 # IMGUI needs a bit more fiddling with...  
 
@@ -227,6 +284,9 @@ PUBLIC
 )
 
 
+
+
+
 # Add and create STB image files specifically
 set(STB_IMAGE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/_deps/stb_image")
 file(DOWNLOAD https://raw.githubusercontent.com/nothings/stb/master/stb_image.h  "${STB_IMAGE_DIR}/stbImage/stb_image.h" STATUS _stat TLS_VERIFY ON LOG _log)
@@ -237,39 +297,47 @@ file(WRITE "${STB_IMAGE_DIR}/stbImage/stb_image.cpp" "#define STB_IMAGE_IMPLEMEN
 add_library(stb_image_impl STATIC "${STB_IMAGE_DIR}/stbImage/stb_image.cpp")
 
 target_include_directories(stb_image_impl PUBLIC "${STB_IMAGE_DIR}")
+#target_include_directories(${APPLICATION_NAME} PRIVATE ${SDL2_SOURCE_DIR}/include ${SDL2_mixer_SOURCE_DIR})
+#target_include_directories(${RENDERER_NAME} PRIVATE ${SDL2_SOURCE_DIR}/include ${SDL2_mixer_SOURCE_DIR})
+
 
 # Use C++20 everywhere
 set_target_properties(${APPLICATION_NAME} PROPERTIES CXX_STANDARD 20)
 set_target_properties(${RENDERER_NAME} PROPERTIES CXX_STANDARD 20)
 set_target_properties(spdlog PROPERTIES CXX_STANDARD 20)
-set_target_properties(glm PROPERTIES CXX_STANDARD 20)
+#set_target_properties(glm PROPERTIES CXX_STANDARD 20)
 set_target_properties(glfw PROPERTIES CXX_STANDARD 20)
 set_target_properties(glad PROPERTIES CXX_STANDARD 20)
 set_target_properties(assimp PROPERTIES CXX_STANDARD 20)
 set_target_properties(imgui_glfw PROPERTIES CXX_STANDARD 20)
 set_target_properties(stb_image_impl PROPERTIES CXX_STANDARD 20)
+set_target_properties(SDL2 PROPERTIES CXX_STANDARD 20)
+set_target_properties(SDL2_mixer PROPERTIES CXX_STANDARD 20)
 
 
 target_link_libraries(${RENDERER_NAME} PRIVATE OpenGL::GL)
 target_link_libraries(${RENDERER_NAME} PRIVATE spdlog)
-target_link_libraries(${RENDERER_NAME} PRIVATE glm)
+#target_link_libraries(${RENDERER_NAME} PRIVATE glm)
 target_link_libraries(${RENDERER_NAME} PRIVATE glfw)
 target_link_libraries(${RENDERER_NAME} PRIVATE glad)
 target_link_libraries(${RENDERER_NAME} PRIVATE assimp)
 target_link_libraries(${RENDERER_NAME} PRIVATE Microsoft.GSL::GSL)
 target_link_libraries(${RENDERER_NAME} PRIVATE imgui_glfw)
 target_link_libraries(${RENDERER_NAME} PRIVATE stb_image_impl)
+target_link_libraries(${RENDERER_NAME} PRIVATE SDL2 SDL2_mixer)
+
 
 target_link_libraries(${APPLICATION_NAME} PRIVATE ${RENDERER_NAME})
 target_link_libraries(${APPLICATION_NAME} PRIVATE OpenGL::GL)
 target_link_libraries(${APPLICATION_NAME} PRIVATE spdlog)
-target_link_libraries(${APPLICATION_NAME} PRIVATE glm)
+#target_link_libraries(${APPLICATION_NAME} PRIVATE glm)
 target_link_libraries(${APPLICATION_NAME} PRIVATE glfw)
 target_link_libraries(${APPLICATION_NAME} PRIVATE glad)
 target_link_libraries(${APPLICATION_NAME} PRIVATE assimp)
 target_link_libraries(${APPLICATION_NAME} PRIVATE Microsoft.GSL::GSL)
 target_link_libraries(${APPLICATION_NAME} PRIVATE imgui_glfw)
 target_link_libraries(${APPLICATION_NAME} PRIVATE stb_image_impl)
+target_link_libraries(${APPLICATION_NAME} PRIVATE SDL2 SDL2_mixer)
 
 set_target_properties(glad PROPERTIES FOLDER "Glad")
 
@@ -284,4 +352,8 @@ set_target_properties(glm PROPERTIES FOLDER "GLM")
 set_target_properties(spdlog PROPERTIES FOLDER "SPDLOG")
 
 set_target_properties(stb_image_impl PROPERTIES FOLDER "stb_image")
+
+set_target_properties(SDL2 PROPERTIES FOLDER "SDL2")
+
+set_target_properties(SDL2_mixer PROPERTIES FOLDER "SDL2_mixer")
 

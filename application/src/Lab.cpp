@@ -5,8 +5,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <numeric> // For std::iota
 #include <string>
-//#include <windows.h>
-//#include <mmsystem.h>
+
 
 Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 {
@@ -27,7 +26,7 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	
 	std::shared_ptr<Texture> groundTexture = std::make_shared<Texture>(groundTextureDesc);
 	std::shared_ptr<Texture> groundTextureTemp = std::make_shared<Texture>(groundTextureDesc);
-	std::shared_ptr<Texture> groundNormalTexture = std::make_shared<Texture>(groundTextureDesc);
+	//std::shared_ptr<Texture> groundNormalTexture = std::make_shared<Texture>(groundTextureDesc);
 
 	//Cube maps -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -163,7 +162,7 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 
 		Relic.scale = glm::vec3(Randomiser::uniformFloatBetween(100.0f, 150.0f) * (( 0.5f *( (7.0f - (1 + rarity)) / 7.0f)) + 0.5f) );
 
-		Relic.translation =  glm::vec3(Randomiser::uniformFloatBetween(Relic.scale.x, 4096.0f - Relic.scale.x), Randomiser::uniformFloatBetween(Relic.scale.y, 4096.0f - Relic.scale.y), -1.0f);
+		Relic.translation =  glm::vec3(Randomiser::uniformFloatBetween(Relic.scale.x, 4096.0f - Relic.scale.x), Randomiser::uniformFloatBetween(Relic.scale.y, 4096.0f - Relic.scale.y), (1.0f - (rarity/6.0f)) - 0.5f);
 		
 
 		Relic.material = RelicMaterial;
@@ -232,24 +231,24 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	ComputePass GroundNormalComputePass;
-	GroundNormalComputePass.material = compute_GroundNormalMaterial;
-	GroundNormalComputePass.workgroups = { 128,128,1 };
-	GroundNormalComputePass.barrier = MemoryBarrier::ShaderImageAccess;
+	//ComputePass GroundNormalComputePass;
+	//GroundNormalComputePass.material = compute_GroundNormalMaterial;
+	//GroundNormalComputePass.workgroups = { 128,128,1 };
+	//GroundNormalComputePass.barrier = MemoryBarrier::ShaderImageAccess;
 
-	Image GroundNormalImg;
-	GroundNormalImg.mipLevel = 0;
-	GroundNormalImg.layered = false;
-	GroundNormalImg.texture = groundNormalTexture;
-	GroundNormalImg.imageUnit = GroundNormalComputePass.material->m_shader->m_imageBindingPoints["groundNormalImg"];
-	GroundNormalImg.access = TextureAccess::ReadWrite;
+	//Image GroundNormalImg;
+	//GroundNormalImg.mipLevel = 0;
+	//GroundNormalImg.layered = false;
+	//GroundNormalImg.texture = groundNormalTexture;
+	//GroundNormalImg.imageUnit = GroundNormalComputePass.material->m_shader->m_imageBindingPoints["groundNormalImg"];
+	//GroundNormalImg.access = TextureAccess::ReadWrite;
 
-	GroundNormalComputePass.images.push_back(GroundImg);
-	GroundNormalComputePass.images.push_back(GroundNormalImg);
+	//GroundNormalComputePass.images.push_back(GroundImg);
+	//GroundNormalComputePass.images.push_back(GroundNormalImg);
 
-	GroundNormalComputePassIDx = m_computeRenderer.getSumPassCount();
-	m_computeRenderer.addComputePass(GroundNormalComputePass);
-	m_computeRenderer.render();
+	//GroundNormalComputePassIDx = m_computeRenderer.getSumPassCount();
+	//m_computeRenderer.addComputePass(GroundNormalComputePass);
+	//m_computeRenderer.render();
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -258,7 +257,7 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	Actor quad;
 	quad.geometry = screenQuadVAO;
 	
-	screenQuadMaterial->setValue("u_GroundDepthTexture", groundTextureTemp);
+	screenQuadMaterial->setValue("u_GroundDepthTexture", groundTexture);
 	
 	//screenQuadMaterial->setValue("u_GroundNormalTexture", groundNormalTexture);
 	quad.material = screenQuadMaterial;
@@ -279,7 +278,7 @@ Scene0::Scene0(GLFWWindowImpl& win) : Layer(win)
 	RenderPass ScreenRelicPass;
 	ScreenRelicPass.scene = m_RelicScene;
 	ScreenRelicPass.parseScene();
-	ScreenRelicPass.target = std::make_shared<FBO>(glm::ivec2(4096,4096), mainScreenPassLayout);
+	ScreenRelicPass.target = std::make_shared<FBO>(glm::ivec2(4096,4096), relicScreenPassLayout);
 	ScreenRelicPass.viewPort = { 0,0,4096, 4096 };
 
 	ScreenRelicPass.camera.projection = glm::ortho(0.f, 4096.0f, 4096.0f, 0.f);
@@ -384,7 +383,7 @@ void Scene0::onUpdate(float timestep)
 		m_DigPos = m_PointerPos;
 	}
 
-	float timeToDig = 3.0f;
+	float timeToDig = 1.0f;
 
 	float Segments = 7.0f;
 	float timePerSegment = 0.6f;
@@ -534,12 +533,27 @@ void Scene0::onUpdate(float timestep)
 	}
 	else {
 		if (Reseting) {
-			ResetWave -= timestep / 3;
-			if (ResetWave <= 0) {
+			ResetWave -= timestep / 5;
+			RelicResetWave -= timestep / 20;
+			for (int i = 0; i < Relics; i++) {
+				auto& Relic = m_RelicScene->m_actors.at(i);
+				Relic.scale *= glm::vec3(1.0f - (timestep/2));
+				Relic.recalc();
+
+			}
+			//spdlog::info("Reset Wave: {:03.5f}", ResetWave);
+			if (ResetWave <= 0 ) {
 				RelicSetWave = -0.1f;
+				
+			}
+			if (!Fliping && ResetWave <= 0) {
+				Flip = !Flip;
+				Fliping = true;
 			}
 			if (ResetWave <= -0.1f) {
 				Reseting = false;
+				Fliping = false;
+				RelicResetWave = 1.0f;
 				
 				for (int i = 0; i < Relics; i++) {
 					ActiveRelics[i] = true;
@@ -553,7 +567,7 @@ void Scene0::onUpdate(float timestep)
 					RelicMaterial->setValue("u_active", (float)(int)true);
 
 					Relic.scale = glm::vec3(Randomiser::uniformFloatBetween(100.0f, 150.0f) * ((0.5f * ((7.0f - (1 + rarity)) / 7.0f)) + 0.5f));
-					Relic.translation = glm::vec3(Randomiser::uniformFloatBetween(Relic.scale.x, 4096.0f - Relic.scale.x), Randomiser::uniformFloatBetween(Relic.scale.y, 4096.0f - Relic.scale.y), -1.0f);
+					Relic.translation = glm::vec3(Randomiser::uniformFloatBetween(Relic.scale.x, 4096.0f - Relic.scale.x), Randomiser::uniformFloatBetween(Relic.scale.y, 4096.0f - Relic.scale.y), (1.0f - (rarity / 6.0f)) - 0.5f);
 					Relic.recalc();
 
 				}
@@ -562,7 +576,7 @@ void Scene0::onUpdate(float timestep)
 	}
 
 	if (RelicSetWave < 1) {
-		RelicSetWave += timestep / 3;
+		RelicSetWave += timestep / 2;
 		if (RelicSetWave >= 1) {
 			RelicSetWave = 1;
 		}
@@ -573,6 +587,7 @@ void Scene0::onUpdate(float timestep)
 	QuadMat->setValue("DigPos",(m_DigPos) );
 	QuadMat->setValue("Progress", x);
 	QuadMat->setValue("RelicFill", RelicSetWave);
+	QuadMat->setValue("u_flip", (float)(int)Flip);
 
 	AAQuadMat->setValue("allTime", allTime);
 	computeGroundPass.material->setValue("Reset", (float)(int)Reseting);

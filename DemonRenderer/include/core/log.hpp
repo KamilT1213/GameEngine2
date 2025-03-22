@@ -6,6 +6,8 @@
 #include "events/event.hpp"
 #include <glm/glm.hpp>
 
+
+
 /** \class LogSystem
  *  \brief Initialises spdlog in a pretty way.
  */

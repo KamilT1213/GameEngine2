@@ -36,6 +36,8 @@ private:
 	bool Pressed{ false };
 	bool finished{ false };
 	bool extrBegan{ false };
+	bool Flip{ true };
+	bool Fliping{ false };
 	int Relics{ 100 };
 	bool ActiveRelics[100];
 	float ProgressSegmentTarget{ 0.0f };
@@ -50,8 +52,9 @@ private:
 	float allTime{ 0.0f };
 	float factor{ 1.0f };
 	float ResetWave{ 1.0f };
+	float RelicResetWave{ 1.0f };
 	float RelicSetWave{ 0.0f };
-	float Subby{ 0.3f };
+	float Subby{ 0.6f };
 
 	size_t GroundComputePassIDx;
 	size_t GroundNormalComputePassIDx;
@@ -85,6 +88,13 @@ private:
 	FBOLayout mainScreenPassLayout = {
 		{AttachmentType::ColourHDR,true},
 		{AttachmentType::ColourHDR,true}
+
+	};	
+	
+	FBOLayout relicScreenPassLayout = {
+		{AttachmentType::ColourHDR,true},
+		{AttachmentType::ColourHDR,true},
+		{AttachmentType::Depth,true}
 
 	};
 
